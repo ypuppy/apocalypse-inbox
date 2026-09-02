@@ -1,80 +1,12 @@
-const state = { integrity: 100, resolved: false };
-
-const actionArea = document.querySelector('#action-area');
-const result = document.querySelector('#result');
-const integrityValue = document.querySelector('#integrity-value');
-const integrityMeter = document.querySelector('#integrity-meter');
-const sandboxDialog = document.querySelector('#sandbox-dialog');
-
-function setIntegrity(value) {
-  state.integrity = value;
-  integrityValue.textContent = `${value}%`;
-  integrityMeter.style.width = `${value}%`;
-  integrityMeter.style.background = value < 60 ? 'var(--red)' : 'var(--green)';
-}
-
-function lockActions() {
-  state.resolved = true;
-  document.querySelectorAll('[data-action]').forEach((button) => { button.disabled = true; });
-}
-
-function showResult(kind, title, message, learning) {
-  lockActions();
-  result.className = `result ${kind}`;
-  result.innerHTML = `
-    <h2>${title}</h2>
-    <p>${message}</p>
-    <p><strong>复盘：</strong>${learning}</p>
-    <button class="action restart" id="restart">重新开始</button>
-  `;
-  result.querySelector('#restart').addEventListener('click', resetGame);
-}
-
-function resolve(action) {
-  if (state.resolved) return;
-
-  if (action === 'accept') {
-    setIntegrity(55);
-    showResult(
-      'accepted',
-      '避难所通行凭证已泄露',
-      '你打开了伪造的领取页面。陌生设备已尝试接入避难所网络，系统完整性 -45%。',
-      '显示名称和邮件正文都可以被伪造。请比较完整发件人域名：<code>north-relief-logistics.co</code> 与可信供应商 <code>northrelief-logistics.co</code> 并不相同。'
-    );
-    return;
-  }
-
-  showResult(
-    'secured',
-    action === 'report' ? '威胁已举报' : '沙盒确认：恶意链接已隔离',
-    action === 'report'
-      ? '威胁情报已发送给附近避难所。你的系统保持安全。'
-      : '隔离环境阻断了跳转与凭证请求。你安全地确认了这是一次域名仿冒。',
-    '域名中的一个额外连字符就足以把你带往攻击者控制的站点。遇到紧急请求时，先检查完整域名，而不是只看品牌名称。'
-  );
-}
-
-actionArea.addEventListener('click', (event) => {
-  const action = event.target.dataset.action;
-  if (!action || state.resolved) return;
-  if (action === 'sandbox') {
-    sandboxDialog.showModal();
-    return;
-  }
-  resolve(action);
-});
-
-document.querySelector('#sandbox-report').addEventListener('click', () => {
-  sandboxDialog.close();
-  resolve('sandbox');
-});
-
-document.querySelector('#sandbox-close').addEventListener('click', () => sandboxDialog.close());
-
-function resetGame() {
-  state.resolved = false;
-  setIntegrity(100);
-  document.querySelectorAll('[data-action]').forEach((button) => { button.disabled = false; });
-  result.className = 'result hidden';
-  result.innerHTML = '';
-}
+const state={day:1,integrity:82,supplies:46,intel:18,unreadThreats:1,resolved:false,night:false};
+const elements={tabs:[...document.querySelectorAll('[data-tab]')],panels:[...document.querySelectorAll('[data-panel]')],integrity:document.querySelector('#integrity-value'),supplies:document.querySelector('#supplies-value'),intel:document.querySelector('#intel-value'),threats:document.querySelector('#threat-value'),inboxBadge:document.querySelector('#inbox-badge'),result:document.querySelector('#result'),selection:document.querySelector('#base-selection'),impact:document.querySelector('#base-impact'),actionArea:document.querySelector('#action-area'),reportSummary:document.querySelector('#report-summary'),timeToggle:document.querySelector('#time-toggle')};
+let baseScene;
+function updateHud(){elements.integrity.textContent=`${state.integrity}%`;elements.supplies.textContent=state.supplies;elements.intel.textContent=state.intel;elements.threats.textContent=state.unreadThreats;elements.inboxBadge.textContent=state.unreadThreats;}
+function showTab(name){elements.tabs.forEach(tab=>tab.classList.toggle('active',tab.dataset.tab===name));elements.panels.forEach(panel=>panel.classList.toggle('hidden',panel.dataset.panel!==name));}
+function showResult(kind,title,message,learning){elements.result.className=`result ${kind}`;elements.result.innerHTML=`<h2>${title}</h2><p>${message}</p><p><strong>复盘：</strong>${learning}</p><button class="secondary-button" id="result-base" type="button">查看基地影响</button>`;elements.result.querySelector('#result-base').addEventListener('click',()=>showTab('base'));}
+function lockActions(){state.resolved=true;document.querySelectorAll('[data-action]').forEach(button=>{button.disabled=true;});}
+function reportThreat(fromSandbox=false){if(state.resolved)return;lockActions();state.unreadThreats=0;state.intel+=fromSandbox?8:6;updateHud();baseScene?.setBuildingState('radio','upgraded');elements.impact.textContent='无线电站获得威胁情报：已升级域名过滤规则。';elements.reportSummary.innerHTML='<strong>已提交：北境救援物流仿冒域名</strong><p>识别到额外连字符、二次跳转与凭证索取。无线电站获得了新的过滤规则。</p>';showTab('report');showResult('secured','威胁已被阻断',`避难所获得 ${fromSandbox?8:6} 点情报；基地没有受到入侵。`,'显示名称可以可信，完整域名却可能被仿冒。紧急请求出现时，优先检查域名与可信联系渠道。');}
+function acceptThreat(){if(state.resolved)return;lockActions();state.integrity=Math.max(0,state.integrity-45);state.unreadThreats=0;updateHud();baseScene?.setBuildingState('relay','damaged');elements.impact.textContent='网络中继器因凭证泄露而受损，夜晚的防线会更脆弱。';showTab('base');showResult('accepted','避难所通行凭证已泄露','伪造页面尝试接入避难所网络。系统完整性 -45%，网络中继器已在地图上标记为受损。','品牌名称和邮件正文都能被伪造。可信供应商是 northrelief-logistics.co，而邮件中的 north-relief-logistics.co 多了一个连字符。');}
+elements.tabs.forEach(tab=>tab.addEventListener('click',()=>showTab(tab.dataset.tab)));elements.actionArea.addEventListener('click',event=>{const action=event.target.dataset.action;if(!action||state.resolved)return;if(action==='accept')acceptThreat();if(action==='report')reportThreat(false);if(action==='sandbox')showTab('sandbox');});document.querySelector('#sandbox-report').addEventListener('click',()=>reportThreat(true));document.querySelector('#return-base').addEventListener('click',()=>showTab('base'));elements.timeToggle.addEventListener('click',()=>{state.night=!state.night;elements.timeToggle.textContent=state.night?'切换至白天':'切换至夜晚';baseScene?.setNight(state.night);});document.addEventListener('open-inbox',()=>showTab('inbox'));
+class ShelterScene extends Phaser.Scene{constructor(){super('ShelterScene');this.buildings=new Map();this.nightOverlay=null;this.glowLayer=null;}create(){baseScene=this;this.drawGround();this.createFence();this.createBuilding('command',235,285,'指挥室',0x6cae75,'点击打开收件箱');this.createBuilding('radio',560,155,'无线电站',0xe0b662,'接收外部求救');this.createBuilding('warehouse',550,325,'仓库',0xa6724f,'储存补给');this.createBuilding('water',745,275,'净水站',0x6bbac8,'住民饮水');this.createBuilding('clinic',755,110,'医疗站',0xc97884,'处理伤员');this.createBuilding('relay',385,125,'网络中继器',0x9a8bc8,'保护通讯链路');this.createResidents();this.nightOverlay=this.add.rectangle(480,270,960,540,0x071021,0).setDepth(20).setScrollFactor(0);this.glowLayer=this.add.graphics().setDepth(21);this.setNight(false);}drawGround(){const g=this.add.graphics(),size=30;for(let y=0;y<18;y+=1){for(let x=0;x<32;x+=1){const colors=[0x6fa85c,0x78b865,0x689e54,0x88b96a],color=colors[(x*7+y*3)%colors.length];g.fillStyle(color,1);g.fillRect(x*size,y*size,size-1,size-1);if((x+y*5)%7===0){g.fillStyle(0x426f3e,.65);g.fillRect(x*size+6,y*size+8,4,8);g.fillRect(x*size+11,y*size+11,3,5);}}}g.fillStyle(0xd7ba79,1);g.fillRect(0,250,960,40);g.fillStyle(0xc7a866,1);g.fillRect(0,287,960,3);}createFence(){const fence=this.add.graphics();fence.lineStyle(5,0x6a5138,1);fence.strokeRect(42,38,876,458);for(let x=55;x<915;x+=28){fence.fillStyle(0x886344,1);fence.fillRect(x,34,5,13);fence.fillRect(x,490,5,13);}}createBuilding(id,x,y,label,color,description){const c=this.add.container(x,y),shadow=this.add.rectangle(8,20,118,42,0x1d3324,.38),body=this.add.rectangle(0,0,104,52,color,1),roof=this.add.polygon(0,-42,[-64,0,0,-31,64,0],0x3f4f3e,1),door=this.add.rectangle(0,16,19,24,0x25422d,1),sign=this.add.text(0,40,label,{fontFamily:'monospace',fontSize:'13px',color:'#f7f0c9',stroke:'#183022',strokeThickness:3}).setOrigin(.5),marker=this.add.rectangle(0,-68,8,13,0xffdf7d,0);c.add([shadow,body,roof,door,sign,marker]);c.setSize(130,100).setInteractive({useHandCursor:true});c.on('pointerover',()=>{marker.setAlpha(1);elements.selection.textContent=`${label} · ${description}`;});c.on('pointerout',()=>marker.setAlpha(0));c.on('pointerdown',()=>{elements.selection.textContent=`${label} · ${description}`;if(id==='command')document.dispatchEvent(new CustomEvent('open-inbox'));});this.buildings.set(id,{container:c,body,roof,marker,color,label,description});}createResidents(){[[145,210,0xf0c878],[655,405,0xe98d75],[455,210,0x92d3de]].forEach(([x,y,color],index)=>{const r=this.add.container(x,y);r.add([this.add.rectangle(0,8,12,10,0x294030,.35),this.add.rectangle(0,0,9,13,color,1),this.add.rectangle(0,-10,8,8,0xf1c692,1)]);this.tweens.add({targets:r,x:x+(index%2?24:-24),duration:2400+index*380,yoyo:true,repeat:-1,ease:'Sine.easeInOut'});});}setBuildingState(id,status){const b=this.buildings.get(id);if(!b)return;if(status==='damaged'){b.body.setFillStyle(0x895252);b.roof.setFillStyle(0x4b2929);b.marker.setFillStyle(0xff7e72).setAlpha(1);elements.selection.textContent=`${b.label} · 受损，需要物资修复`;}if(status==='upgraded'){b.body.setFillStyle(0x99d36a);b.marker.setFillStyle(0xffdf7d).setAlpha(1);elements.selection.textContent=`${b.label} · 已升级域名过滤规则`;}}setNight(isNight){this.nightOverlay.setAlpha(isNight?.62:0);this.glowLayer.clear();if(isNight){this.glowLayer.fillStyle(0xffdb7d,.12);[[235,270],[560,140],[550,310],[745,260],[755,95],[385,110]].forEach(([x,y])=>this.glowLayer.fillCircle(x,y,68));elements.impact.textContent='夜晚降临：受损的网络中继器会使外围防线更加脆弱。';}else if(!state.resolved){elements.impact.textContent='白天稳定：无线电站正在接收补给请求。';}}}
+new Phaser.Game({type:Phaser.AUTO,parent:'game-container',width:960,height:540,backgroundColor:'#6fa85c',pixelArt:true,antialias:false,scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},scene:ShelterScene});updateHud();

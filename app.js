@@ -2,10 +2,14 @@ const state = {
   day: 1,
   integrity: 82,
   supplies: 46,
+  coins: 30,
   intel: 18,
+  seeds: 0,
   unreadThreats: 1,
   resolved: false,
   night: false,
+  flags: new Set(),
+  nightThreats: [],
 };
 
 const elements = {
@@ -13,6 +17,7 @@ const elements = {
   panels: [...document.querySelectorAll('[data-panel]')],
   integrity: document.querySelector('#integrity-value'),
   supplies: document.querySelector('#supplies-value'),
+  coins: document.querySelector('#coins-value'),
   intel: document.querySelector('#intel-value'),
   threats: document.querySelector('#threat-value'),
   inboxBadge: document.querySelector('#inbox-badge'),
@@ -22,16 +27,34 @@ const elements = {
   actionArea: document.querySelector('#action-area'),
   reportSummary: document.querySelector('#report-summary'),
   timeToggle: document.querySelector('#time-toggle'),
+  mailCount: document.querySelector('#mail-count'),
+  mailFamily: document.querySelector('#mail-family'),
+  mailSubject: document.querySelector('#mail-subject'),
+  mailSender: document.querySelector('#mail-sender'),
+  mailTime: document.querySelector('#mail-time'),
+  mailBody: document.querySelector('#mail-body'),
+  mailClue: document.querySelector('#mail-clue'),
+  sandboxLog: document.querySelector('#sandbox-log'),
 };
 
 let baseScene;
+let activeCard = eventCards.find((card) => card.id === 'shipment-water-filter-redirect');
+
+const familyLabels = {
+  'system-transport': '系统运输',
+  'world-market': '世界交易',
+  people: '人员与求救',
+  maintenance: '系统维护',
+};
 
 function updateHud() {
   elements.integrity.textContent = `${state.integrity}%`;
   elements.supplies.textContent = state.supplies;
+  elements.coins.textContent = state.coins;
   elements.intel.textContent = state.intel;
   elements.threats.textContent = state.unreadThreats;
   elements.inboxBadge.textContent = state.unreadThreats;
+  elements.mailCount.textContent = `收件箱 / ${state.unreadThreats} 封未读`;
 }
 
 function showTab(name) {
@@ -53,44 +76,72 @@ function showResult(kind, title, message, learning) {
 function lockActions() {
   state.resolved = true;
   document.querySelectorAll('[data-action]').forEach((button) => { button.disabled = true; });
+  document.querySelector('#sandbox-report').disabled = true;
 }
 
-function reportThreat(fromSandbox = false) {
+function renderCard(card) {
+  elements.mailFamily.textContent = familyLabels[card.family];
+  elements.mailSubject.textContent = card.subject;
+  elements.mailSender.textContent = card.sender;
+  elements.mailTime.textContent = card.time;
+  elements.mailClue.textContent = card.clue;
+  elements.mailBody.replaceChildren();
+  card.paragraphs.forEach((text) => {
+    const paragraph = document.createElement('p');
+    paragraph.textContent = text;
+    if (text.includes('：') && (text.includes('/') || text.includes('页面'))) paragraph.classList.add('fake-link');
+    elements.mailBody.append(paragraph);
+  });
+  elements.sandboxLog.replaceChildren();
+  card.sandbox.forEach((text, index) => {
+    const line = document.createElement('p');
+    line.textContent = `${index === card.sandbox.length - 1 && card.truth === 'malicious' ? '! ' : '> '}${text}`;
+    if (index === card.sandbox.length - 1 && card.truth === 'malicious') line.classList.add('danger');
+    elements.sandboxLog.append(line);
+  });
+  const conclusion = document.createElement('p');
+  conclusion.classList.add('safe');
+  conclusion.textContent = card.truth === 'malicious' ? '✓ 隔离环境没有执行异常操作。' : '✓ 未发现异常行为；仍请与订单档案交叉核验。';
+  elements.sandboxLog.append(conclusion);
+}
+
+function applyResources(resources = {}) {
+  Object.entries(resources).forEach(([resource, amount]) => {
+    state[resource] = Math.max(0, (state[resource] ?? 0) + amount);
+  });
+}
+
+function resolveMail(action) {
   if (state.resolved) return;
+  const outcome = activeCard.outcomes[action];
+  if (!outcome) return;
 
   lockActions();
   state.unreadThreats = 0;
-  state.intel += fromSandbox ? 8 : 6;
+  applyResources(outcome.resources);
+  if (outcome.nightThreat) state.nightThreats.push(outcome.nightThreat);
+  if (outcome.facility) baseScene?.setBuildingState(outcome.facility, outcome.facilityState);
+  if (outcome.unlockExpansion) baseScene?.unlockExpansion(outcome.unlockExpansion);
+  elements.impact.textContent = outcome.impact;
   updateHud();
-  baseScene?.setBuildingState('radio', 'upgraded');
-  elements.impact.textContent = '无线电站获得威胁情报：已升级域名过滤规则。';
-  elements.reportSummary.innerHTML = '<strong>已提交：北境救援物流仿冒域名</strong><p>识别到额外连字符、二次跳转与凭证索取。无线电站获得了新的过滤规则。</p>';
-  showTab('report');
-  showResult('secured', '威胁已被阻断', `避难所获得 ${fromSandbox ? 8 : 6} 点情报；基地没有受到入侵。`, '显示名称可以可信，完整域名却可能被仿冒。紧急请求出现时，优先检查域名与可信联系渠道。');
-}
 
-function acceptThreat() {
-  if (state.resolved) return;
-
-  lockActions();
-  state.integrity = Math.max(0, state.integrity - 45);
-  state.unreadThreats = 0;
-  updateHud();
-  baseScene?.setBuildingState('relay', 'damaged');
-  elements.impact.textContent = '网络中继器因凭证泄露而受损，夜晚的防线会更脆弱。';
-  showTab('base');
-  showResult('accepted', '避难所通行凭证已泄露', '伪造页面尝试接入避难所网络。系统完整性 -45%，网络中继器已在地图上标记为受损。', '品牌名称和邮件正文都能被伪造。可信供应商是 northrelief-logistics.co，而邮件中的 north-relief-logistics.co 多了一个连字符。');
+  if (outcome.report) {
+    elements.reportSummary.innerHTML = `<strong>已提交：${activeCard.subject}</strong><p>${outcome.report}</p>`;
+    showTab('report');
+  } else {
+    showTab('base');
+  }
+  showResult(outcome.kind, outcome.title, outcome.message, outcome.learning);
 }
 
 elements.tabs.forEach((tab) => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
 elements.actionArea.addEventListener('click', (event) => {
   const action = event.target.dataset.action;
   if (!action || state.resolved) return;
-  if (action === 'accept') acceptThreat();
-  if (action === 'report') reportThreat(false);
+  if (action === 'accept' || action === 'report') resolveMail(action);
   if (action === 'sandbox') showTab('sandbox');
 });
-document.querySelector('#sandbox-report').addEventListener('click', () => reportThreat(true));
+document.querySelector('#sandbox-report').addEventListener('click', () => resolveMail('report'));
 document.querySelector('#return-base').addEventListener('click', () => showTab('base'));
 elements.timeToggle.addEventListener('click', () => {
   state.night = !state.night;
@@ -256,4 +307,5 @@ new Phaser.Game({
   scene: ShelterScene,
 });
 
+renderCard(activeCard);
 updateHud();

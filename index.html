@@ -12,7 +12,7 @@
       <header class="hud">
         <div class="brand-block"><p class="eyebrow">SHELTER 07 // COMMS ONLINE</p><h1>末日收件箱</h1></div>
         <div class="hud-stats" aria-label="避难所资源">
-          <div><span>第</span><strong id="day-value">01</strong><span>天</span></div><div><span>完整性</span><strong id="integrity-value">82%</strong></div><div><span>物资</span><strong id="supplies-value">46</strong></div><div><span>情报</span><strong id="intel-value">18</strong></div><div class="threat-stat"><span>未读威胁</span><strong id="threat-value">1</strong></div>
+          <div><span>第</span><strong id="day-value">01</strong><span>天</span></div><div><span>完整性</span><strong id="integrity-value">82%</strong></div><div><span>物资</span><strong id="supplies-value">46</strong></div><div><span>金币</span><strong id="coins-value">30</strong></div><div><span>情报</span><strong id="intel-value">18</strong></div><div class="threat-stat"><span>未读邮件</span><strong id="threat-value">1</strong></div>
         </div>
       </header>
       <nav class="main-tabs" aria-label="避难所功能">
@@ -24,13 +24,14 @@
         <div class="base-footer"><div><span class="label">选中建筑</span><strong id="base-selection">指挥室 · 点击它可打开收件箱</strong></div><div><span class="label">基地影响</span><strong id="base-impact">无线电站正在接收补给请求。</strong></div></div>
       </section>
       <section id="inbox-panel" class="panel hidden" data-panel="inbox" aria-labelledby="mail-subject">
-        <div class="mail-window"><div class="mail-toolbar"><span>收件箱 / 1 封未读</span><span class="status-dot">外部邮件</span></div><article class="mail-content"><p class="tag">外部发件人</p><h2 id="mail-subject">【紧急】你的净水滤芯已到达中转站</h2><dl class="mail-meta"><div><dt>发件人</dt><dd>北境救援物流 &lt;<span class="suspicious">dispatch@north-relief-logistics.co</span>&gt;</dd></div><div><dt>时间</dt><dd>03:17</dd></div></dl><div class="mail-body"><p>指挥官，你预订的净水滤芯已经抵达东侧中转站。</p><p>车辆只会保留 <strong>15 分钟</strong>；请立即确认领取，否则物资将转交给其他避难所。</p><p class="fake-link">确认领取：north-relief-logistics.co/claim/2048</p><p>— 北境救援物流调度台</p></div><aside class="clue"><span>可疑线索</span><p>可信供应商域名是 <code>northrelief-logistics.co</code>。这封邮件的域名多了一个连字符。</p></aside></article><div class="actions" id="action-area"><button class="action accept" data-action="accept" type="button">接受并打开</button><button class="action report" data-action="report" type="button">举报</button><button class="action sandbox" data-action="sandbox" type="button">隔离进沙盒</button></div></div>
+        <div class="mail-window"><div class="mail-toolbar"><span id="mail-count">收件箱 / 1 封未读</span><span class="status-dot">外部邮件</span></div><article class="mail-content"><p class="tag" id="mail-family">系统运输</p><h2 id="mail-subject"></h2><dl class="mail-meta"><div><dt>发件人</dt><dd id="mail-sender"></dd></div><div><dt>时间</dt><dd id="mail-time"></dd></div></dl><div class="mail-body" id="mail-body"></div><aside class="clue"><span id="clue-label">核验线索</span><p id="mail-clue"></p></aside></article><div class="actions" id="action-area"><button class="action accept" data-action="accept" type="button">接受并执行</button><button class="action report" data-action="report" type="button">举报</button><button class="action sandbox" data-action="sandbox" type="button">隔离进沙盒</button></div></div>
       </section>
-      <section id="sandbox-panel" class="panel hidden" data-panel="sandbox"><div class="tool-panel"><p class="eyebrow">ISOLATED ENVIRONMENT</p><h2>隔离沙盒</h2><p class="panel-copy">沙盒不会打开真实链接；它只展示本局虚构邮件的安全分析结果。</p><div class="terminal" aria-label="沙盒分析日志"><p><span>&gt;</span> 打开隔离浏览器…</p><p><span>&gt;</span> north-relief-logistics.co → northrelief-logistics-login.co</p><p class="danger"><span>!</span> 目标页面请求避难所通行凭证。</p><p class="safe"><span>✓</span> 凭证请求已被拦截。</p></div><div class="actions"><button id="sandbox-report" class="action report" type="button">确认举报</button><button class="secondary-button" data-tab="inbox" type="button">返回邮件</button></div></div></section>
+      <section id="sandbox-panel" class="panel hidden" data-panel="sandbox"><div class="tool-panel"><p class="eyebrow">ISOLATED ENVIRONMENT</p><h2>隔离沙盒</h2><p class="panel-copy">沙盒不会打开真实链接；它只展示本局虚构邮件的安全分析结果。</p><div class="terminal" id="sandbox-log" aria-label="沙盒分析日志"></div><div class="actions"><button id="sandbox-report" class="action report" type="button">确认举报</button><button class="secondary-button" data-tab="inbox" type="button">返回邮件</button></div></div></section>
       <section id="report-panel" class="panel hidden" data-panel="report"><div class="tool-panel"><p class="eyebrow">THREAT INTELLIGENCE</p><h2>举报台</h2><p class="panel-copy">正确举报会为避难所积累情报；情报将用于升级邮件过滤器与无线电站。</p><div id="report-summary" class="report-summary"><strong>暂无已提交的威胁情报。</strong><p>从收件箱或沙盒提交可疑邮件。</p></div><button id="return-base" class="secondary-button" type="button">返回基地</button></div></section>
       <section id="result" class="result hidden" aria-live="polite"></section>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+    <script src="./events.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

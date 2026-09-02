@@ -106,7 +106,7 @@ class ShelterScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image('base-day', './assets/base-day.png');
+    this.load.image('base-day', './assets/base-day.webp');
   }
 
   create() {

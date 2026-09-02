@@ -6,219 +6,30 @@ const state = {
   intel: 18,
   seeds: 0,
   sandboxUses: 1,
-  unreadThreats: 1,
+  unread: 1,
   resolved: false,
   night: false,
-  flags: new Set(),
+  screen: 'base',
+  baseHint: '指挥室有一封待处理邮件。',
+  impact: '无线电站正在接收外部请求。',
+  report: null,
+  result: null,
   guaranteedNightEffects: [],
   deferredEvents: [],
   construction: { blueprints: new Set(), components: {}, labour: 0, materials: { wood: 0, scrap: 0 } },
 };
 
-const elements = {
-  tabs: [...document.querySelectorAll('[data-tab]')],
-  panels: [...document.querySelectorAll('[data-panel]')],
-  integrity: document.querySelector('#integrity-value'),
-  supplies: document.querySelector('#supplies-value'),
-  coins: document.querySelector('#coins-value'),
-  intel: document.querySelector('#intel-value'),
-  sandbox: document.querySelector('#sandbox-value'),
-  threats: document.querySelector('#threat-value'),
-  inboxBadge: document.querySelector('#inbox-badge'),
-  result: document.querySelector('#result'),
-  selection: document.querySelector('#base-selection'),
-  impact: document.querySelector('#base-impact'),
-  actionArea: document.querySelector('#action-area'),
-  reportSummary: document.querySelector('#report-summary'),
-  timeToggle: document.querySelector('#time-toggle'),
-  mailCount: document.querySelector('#mail-count'),
-  mailFamily: document.querySelector('#mail-family'),
-  mailSubject: document.querySelector('#mail-subject'),
-  mailSender: document.querySelector('#mail-sender'),
-  mailTime: document.querySelector('#mail-time'),
-  mailBody: document.querySelector('#mail-body'),
-  mailClue: document.querySelector('#mail-clue'),
-  sandboxLog: document.querySelector('#sandbox-log'),
-  verifyClue: document.querySelector('#verify-clue'),
-  sandboxAction: document.querySelector('[data-action="sandbox"]'),
-};
-
-let baseScene;
-let activeCard = eventCards.find((card) => card.id === 'shipment-water-filter-redirect');
-
-const familyLabels = {
-  'system-transport': '系统运输',
-  'world-market': '世界交易',
-  people: '人员与求救',
-  maintenance: '系统维护',
-};
-
-function updateHud() {
-  elements.integrity.textContent = `${state.integrity}%`;
-  elements.supplies.textContent = state.supplies;
-  elements.coins.textContent = state.coins;
-  elements.intel.textContent = state.intel;
-  elements.sandbox.textContent = `${state.sandboxUses}/1`;
-  elements.threats.textContent = state.unreadThreats;
-  elements.inboxBadge.textContent = state.unreadThreats;
-  elements.mailCount.textContent = `收件箱 / ${state.unreadThreats} 封未读`;
-}
-
-function showTab(name) {
-  elements.tabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.tab === name));
-  elements.panels.forEach((panel) => panel.classList.toggle('hidden', panel.dataset.panel !== name));
-}
-
-function showResult(kind, title, message, learning) {
-  elements.result.className = `result ${kind}`;
-  elements.result.innerHTML = `
-    <h2>${title}</h2>
-    <p>${message}</p>
-    <p><strong>复盘：</strong>${learning}</p>
-    <button class="secondary-button" id="result-base" type="button">查看基地影响</button>
-  `;
-  elements.result.querySelector('#result-base').addEventListener('click', () => showTab('base'));
-}
-
-function lockActions() {
-  state.resolved = true;
-  document.querySelectorAll('[data-action]').forEach((button) => { button.disabled = true; });
-  document.querySelector('#sandbox-report').disabled = true;
-  elements.verifyClue.disabled = true;
-}
-
-function renderCard(card) {
-  elements.mailFamily.textContent = familyLabels[card.family];
-  elements.mailSubject.textContent = card.subject;
-  elements.mailSender.textContent = card.sender;
-  elements.mailTime.textContent = card.time;
-  elements.mailClue.textContent = '';
-  elements.mailClue.classList.add('hidden');
-  elements.verifyClue.disabled = false;
-  elements.verifyClue.textContent = `花 ${card.verificationCost ?? 2} 金币核验`;
-  document.querySelector('#sandbox-report').disabled = true;
-  elements.sandboxAction.disabled = card.sandboxEligible === false || state.sandboxUses <= 0;
-  elements.sandboxAction.textContent = card.sandboxEligible === false
-    ? '此邮件不能使用沙盒'
-    : `隔离进沙盒（${state.sandboxUses}/1）`;
-  document.querySelector('[data-action="accept"]').textContent = card.acceptLabel ?? '接受并执行';
-  elements.mailBody.replaceChildren();
-  card.paragraphs.forEach((text) => {
-    const paragraph = document.createElement('p');
-    paragraph.textContent = text;
-    if (text.includes('：') && (text.includes('/') || text.includes('页面'))) paragraph.classList.add('fake-link');
-    elements.mailBody.append(paragraph);
-  });
-  elements.sandboxLog.replaceChildren();
-  card.sandbox.forEach((text, index) => {
-    const line = document.createElement('p');
-    line.textContent = `${index === card.sandbox.length - 1 && card.truth === 'malicious' ? '! ' : '> '}${text}`;
-    if (index === card.sandbox.length - 1 && card.truth === 'malicious') line.classList.add('danger');
-    elements.sandboxLog.append(line);
-  });
-  const conclusion = document.createElement('p');
-  conclusion.classList.add('safe');
-  conclusion.textContent = card.truth === 'malicious' ? '✓ 隔离环境没有执行异常操作。' : '✓ 未发现异常行为；仍请与订单档案交叉核验。';
-  elements.sandboxLog.append(conclusion);
-}
-
-function revealVerification() {
-  if (state.resolved || !activeCard.clue || !elements.mailClue.classList.contains('hidden')) return;
-  const cost = activeCard.verificationCost ?? 2;
-  if (state.coins < cost) {
-    elements.impact.textContent = '金币不足，无法调用外部核验档案。';
-    return;
-  }
-  state.coins -= cost;
-  elements.mailClue.textContent = activeCard.clue;
-  elements.mailClue.classList.remove('hidden');
-  elements.verifyClue.disabled = true;
-  elements.verifyClue.textContent = '核验完成';
-  updateHud();
-}
-
-function useSandbox() {
-  if (state.resolved) return;
-  if (activeCard.sandboxEligible === false) {
-    elements.impact.textContent = '此事件没有可隔离的链接或附件；请改用付费核验。';
-    return;
-  }
-  if (state.sandboxUses <= 0) {
-    elements.impact.textContent = '今天的沙盒额度已用尽，明天清晨才会恢复。';
-    return;
-  }
-  state.sandboxUses -= 1;
-  document.querySelector('#sandbox-report').disabled = false;
-  elements.sandboxAction.disabled = true;
-  elements.sandboxAction.textContent = '今日沙盒已使用';
-  updateHud();
-  showTab('sandbox');
-}
-
-function applyResources(resources = {}) {
-  Object.entries(resources).forEach(([resource, amount]) => {
-    state[resource] = Math.max(0, (state[resource] ?? 0) + amount);
-  });
-}
-
-function applyConstructionReward(reward) {
-  if (!reward) return;
-  reward.blueprints?.forEach((blueprint) => state.construction.blueprints.add(blueprint));
-  Object.entries(reward.components ?? {}).forEach(([component, amount]) => {
-    state.construction.components[component] = (state.construction.components[component] ?? 0) + amount;
-  });
-  state.construction.labour += reward.labour ?? 0;
-  Object.entries(reward.materials ?? {}).forEach(([material, amount]) => {
-    state.construction.materials[material] = (state.construction.materials[material] ?? 0) + amount;
-  });
-}
-
-function resolveMail(action) {
-  if (state.resolved) return;
-  const outcome = activeCard.outcomes[action];
-  if (!outcome) return;
-
-  lockActions();
-  state.unreadThreats = 0;
-  applyResources(outcome.resources);
-  applyConstructionReward(outcome.constructionReward);
-  if (outcome.guaranteedNightEffect) state.guaranteedNightEffects.push(outcome.guaranteedNightEffect);
-  if (outcome.retryAfterDays || outcome.marketBlacklistDays || outcome.followUp) state.deferredEvents.push({ cardId: activeCard.id, ...outcome });
-  if (outcome.facility) baseScene?.setBuildingState(outcome.facility, outcome.facilityState);
-  if (outcome.unlockExpansion) baseScene?.unlockExpansion(outcome.unlockExpansion);
-  elements.impact.textContent = outcome.impact;
-  updateHud();
-
-  if (outcome.report) {
-    elements.reportSummary.innerHTML = `<strong>已提交：${activeCard.subject}</strong><p>${outcome.report}</p>`;
-    showTab('report');
-  } else {
-    showTab('base');
-  }
-  showResult(outcome.kind, outcome.title, outcome.message, outcome.learning);
-}
-
-elements.tabs.forEach((tab) => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
-elements.actionArea.addEventListener('click', (event) => {
-  const action = event.target.dataset.action;
-  if (!action || state.resolved) return;
-  if (action === 'accept' || action === 'report') resolveMail(action);
-  if (action === 'sandbox') useSandbox();
-});
-elements.verifyClue.addEventListener('click', revealVerification);
-document.querySelector('#sandbox-report').addEventListener('click', () => resolveMail('report'));
-document.querySelector('#return-base').addEventListener('click', () => showTab('base'));
-elements.timeToggle.addEventListener('click', () => {
-  state.night = !state.night;
-  elements.timeToggle.textContent = state.night ? '切换至白天' : '切换至夜晚';
-  baseScene?.setNight(state.night);
-});
-document.addEventListener('open-inbox', () => showTab('inbox'));
+const activeCard = eventCards.find((card) => card.id === 'shipment-water-filter-redirect');
+const familyLabels = { 'system-transport': '系统运输', 'world-market': '世界交易', people: '人员与求救', maintenance: '系统维护' };
+const palette = { ink: '#f5eed7', muted: '#b6b8a7', panel: 0x10231b, deep: 0x07120d, line: 0x628472, moss: 0xa7d97d, sun: 0xf1c765, danger: 0xef8074, blue: 0x8acb81 };
 
 class ShelterScene extends Phaser.Scene {
   constructor() {
     super('ShelterScene');
+    this.ui = [];
     this.buildings = new Map();
+    this.verified = false;
+    this.sandboxViewed = false;
   }
 
   preload() {
@@ -226,151 +37,251 @@ class ShelterScene extends Phaser.Scene {
   }
 
   create() {
-    baseScene = this;
-    this.add.image(480, 270, 'base-day').setDisplaySize(960, 540);
-
-    this.createBuildingZone('command', 468, 175, 185, 120, '指挥室', '点击打开收件箱');
-    this.createBuildingZone('radio', 132, 142, 118, 246, '无线电站', '接收外部求救');
-    this.createBuildingZone('warehouse', 720, 172, 190, 160, '仓库', '储存补给');
-    this.createBuildingZone('clinic', 535, 405, 145, 110, '医疗站', '处理伤员');
-    this.createBuildingZone('relay', 142, 350, 120, 122, '网络中继器', '保护通讯链路');
-    this.createExpansionZone('garden', 245, 246, 168, 124, '菜园用地', '未开发 · 需要菜园蓝图与种子');
-    this.createExpansionZone('water', 724, 385, 170, 134, '净水设施用地', '未开发 · 需要净水器与滤芯');
-    this.createExpansionZone('west-yard', 285, 365, 135, 146, '西侧扩建地块', '预留 · 等待后续任务解锁');
-    this.createExpansionZone('east-yard', 842, 360, 118, 162, '东侧扩建地块', '预留 · 等待后续任务解锁');
-    this.createExpansionZone('south-yard', 445, 483, 212, 74, '南门外扩区', '预留 · 可扩展防线或工坊');
-    this.createResidents();
-
-    this.nightOverlay = this.add.rectangle(480, 270, 960, 540, 0x071021, 0).setDepth(20);
-    this.glowLayer = this.add.graphics().setDepth(21);
+    this.add.image(640, 360, 'base-day').setDisplaySize(1280, 720).setDepth(0);
+    this.nightOverlay = this.add.rectangle(640, 360, 1280, 720, 0x071021, 0).setDepth(20);
+    this.createWorldZones();
     this.setNight(false);
+    this.render();
   }
 
-  createBuildingZone(id, x, y, width, height, label, description) {
-    const frame = this.add.rectangle(x, y, width, height, 0xffdf7d, 0).setStrokeStyle(3, 0xffdf7d, 0).setDepth(12);
-    const marker = this.add.circle(x + width / 2 - 14, y - height / 2 + 14, 7, 0xffdf7d, 0).setDepth(13);
-    const zone = this.add.zone(x, y, width, height).setInteractive({ useHandCursor: true }).setDepth(14);
+  createWorldZones() {
+    this.createWorldZone('command', 624, 233, 245, 158, '指挥室', '打开收件箱', () => this.open('inbox'));
+    this.createWorldZone('radio', 176, 189, 157, 328, '无线电站', '核验档案与接收求助');
+    this.createWorldZone('warehouse', 960, 229, 250, 210, '仓库', '储存物资与组件');
+    this.createWorldZone('clinic', 713, 540, 190, 150, '医疗站', '处理伤员');
+    this.createWorldZone('relay', 190, 467, 160, 160, '网络中继器', '保护通讯链路');
+    this.createWorldZone('garden', 327, 328, 224, 165, '菜园用地', '未开发：需要蓝图、种子、劳动力与材料', null, 'expansion');
+    this.createWorldZone('water', 965, 513, 225, 178, '净水设施用地', '未开发：需要蓝图、组件、劳动力与材料', null, 'expansion');
+    this.createWorldZone('west-yard', 380, 487, 180, 190, '西侧扩建地块', '预留：未来可扩展防线或工坊', null, 'expansion');
+    this.createWorldZone('east-yard', 1120, 480, 150, 190, '东侧扩建地块', '预留：未来可扩展设施', null, 'expansion');
+  }
 
+  createWorldZone(id, x, y, width, height, label, description, action = null, kind = 'building') {
+    const color = kind === 'expansion' ? palette.blue : palette.sun;
+    const frame = this.add.rectangle(x, y, width, height, color, 0).setStrokeStyle(3, color, 0).setDepth(8);
+    const marker = this.add.circle(x + width / 2 - 14, y - height / 2 + 14, 7, color, 0).setDepth(9);
+    const zone = this.add.zone(x, y, width, height).setDepth(10).setInteractive({ useHandCursor: true });
     zone.on('pointerover', () => {
-      frame.setStrokeStyle(3, 0xffdf7d, .92);
-      marker.setFillStyle(0xffdf7d).setAlpha(1);
-      elements.selection.textContent = `${label} · ${description}`;
+      if (state.screen !== 'base') return;
+      frame.setStrokeStyle(3, color, .92);
+      marker.setAlpha(1);
+      this.setHint(`${label} · ${description}`);
     });
     zone.on('pointerout', () => {
       if (!this.buildings.get(id)?.status) {
-        frame.setStrokeStyle(3, 0xffdf7d, 0);
+        frame.setStrokeStyle(3, color, 0);
         marker.setAlpha(0);
       }
     });
     zone.on('pointerdown', () => {
-      elements.selection.textContent = `${label} · ${description}`;
-      if (id === 'command') document.dispatchEvent(new CustomEvent('open-inbox'));
+      if (state.screen !== 'base') return;
+      this.setHint(`${label} · ${description}`);
+      if (action) action();
     });
-
-    this.buildings.set(id, { frame, marker, label, description, status: null });
+    this.buildings.set(id, { frame, marker, zone, label, description, kind, status: null });
   }
 
-  createExpansionZone(id, x, y, width, height, label, description) {
-    const frame = this.add.rectangle(x, y, width, height, 0x8acb81, 0).setStrokeStyle(2, 0x8acb81, 0).setDepth(12);
-    const marker = this.add.circle(x + width / 2 - 13, y - height / 2 + 13, 6, 0x8acb81, 0).setDepth(13);
-    const zone = this.add.zone(x, y, width, height).setInteractive({ useHandCursor: true }).setDepth(14);
-
-    zone.on('pointerover', () => {
-      frame.setStrokeStyle(2, 0x8acb81, .88);
-      marker.setFillStyle(0x8acb81).setAlpha(1);
-      const status = this.buildings.get(id)?.status;
-      elements.selection.textContent = status === 'locked'
-        ? `${label} · ${description}`
-        : `${label} · 蓝图已到位，可部署设施`;
-    });
-    zone.on('pointerout', () => {
-      if (this.buildings.get(id)?.status === 'locked') {
-        frame.setStrokeStyle(2, 0x8acb81, 0);
-        marker.setAlpha(0);
-      }
-    });
-    zone.on('pointerdown', () => {
-      const status = this.buildings.get(id)?.status;
-      if (status === 'locked') {
-        elements.selection.textContent = `${label} · 未解锁`;
-        elements.impact.textContent = '这块地已预留。后续正确处置邮件可带来蓝图、物资或施工权限。';
-      } else {
-        elements.selection.textContent = `${label} · 蓝图已到位，可部署设施`;
-      }
-    });
-
-    this.buildings.set(id, { frame, marker, label, description, status: 'locked', kind: 'expansion' });
+  setHint(text) {
+    state.baseHint = text;
+    this.hintText?.setText(text);
   }
 
-  createResidents() {
-    [[345, 290, 0xf1c278], [590, 290, 0xe57e72], [635, 340, 0x90c8d0]].forEach(([x, y, color], index) => {
-      const resident = this.add.container(x, y).setDepth(11);
-      resident.add([
-        this.add.ellipse(0, 9, 16, 7, 0x18311f, .35),
-        this.add.rectangle(0, 0, 8, 13, color, 1),
-        this.add.rectangle(0, -10, 8, 8, 0xf2c99b, 1),
-      ]);
-      this.tweens.add({
-        targets: resident,
-        x: x + (index % 2 ? 34 : -30),
-        duration: 2800 + index * 400,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.easeInOut',
-      });
-    });
+  setNight(isNight) {
+    state.night = isNight;
+    this.nightOverlay.setAlpha(isNight ? .6 : 0);
   }
 
   setBuildingState(id, status) {
     const building = this.buildings.get(id);
     if (!building) return;
-
     building.status = status;
-    if (status === 'damaged') {
-      building.frame.setStrokeStyle(4, 0xff7168, 1);
-      building.marker.setFillStyle(0xff7168).setAlpha(1);
-      elements.selection.textContent = `${building.label} · 受损，需要物资修复`;
-    }
-    if (status === 'upgraded') {
-      building.frame.setStrokeStyle(4, 0xa7d97d, 1);
-      building.marker.setFillStyle(0xa7d97d).setAlpha(1);
-      elements.selection.textContent = `${building.label} · 已升级域名过滤规则`;
-    }
-    if (status === 'available') {
-      building.frame.setStrokeStyle(3, 0x8acb81, 1);
-      building.marker.setFillStyle(0x8acb81).setAlpha(1);
-      elements.selection.textContent = `${building.label} · 蓝图已到位，可部署设施`;
-    }
+    const color = status === 'damaged' ? palette.danger : palette.moss;
+    building.frame.setStrokeStyle(4, color, 1);
+    building.marker.setFillStyle(color).setAlpha(1);
   }
 
   unlockExpansion(id) {
     this.setBuildingState(id, 'available');
   }
 
-  setNight(isNight) {
-    this.nightOverlay.setAlpha(isNight ? .61 : 0);
-    this.glowLayer.clear();
-    if (isNight) {
-      this.glowLayer.fillStyle(0xffdc7e, .16);
-      [[468, 175], [132, 142], [720, 172], [708, 390], [535, 405], [142, 350]].forEach(([x, y]) => this.glowLayer.fillCircle(x, y, 74));
-      elements.impact.textContent = '夜晚降临：受损的网络中继器会使外围防线更加脆弱。';
-    } else if (!state.resolved) {
-      elements.impact.textContent = '白天稳定：无线电站正在接收补给请求。';
+  open(screen) {
+    state.screen = screen;
+    this.render();
+  }
+
+  keep(...objects) {
+    objects.forEach((object) => this.ui.push(object));
+    return objects[objects.length - 1];
+  }
+
+  clearUi() {
+    this.ui.forEach((object) => object.destroy());
+    this.ui = [];
+  }
+
+  text(x, y, content, style = {}) {
+    return this.keep(this.add.text(x, y, content, { fontFamily: 'system-ui, sans-serif', fontSize: '16px', color: palette.ink, ...style }).setDepth(30));
+  }
+
+  rect(x, y, width, height, color = palette.panel, alpha = .94, stroke = palette.line) {
+    return this.keep(this.add.rectangle(x, y, width, height, color, alpha).setStrokeStyle(1, stroke, .9).setDepth(29));
+  }
+
+  button(x, y, width, height, label, onClick, tone = 'default', disabled = false) {
+    const colors = { default: [0x183228, palette.line, palette.ink], moss: [palette.moss, palette.moss, '#102212'], danger: [palette.danger, palette.danger, '#2d0c08'], sun: [palette.sun, palette.sun, '#30250d'] };
+    const [fill, stroke, textColor] = colors[tone];
+    const box = this.keep(this.add.rectangle(x, y, width, height, fill, disabled ? .35 : 1).setStrokeStyle(1, stroke, .95).setDepth(31));
+    const caption = this.text(x, y, label, { fontSize: '14px', fontStyle: 'bold', color: textColor }).setOrigin(.5);
+    if (!disabled) {
+      box.setInteractive({ useHandCursor: true });
+      box.on('pointerover', () => box.setAlpha(.82));
+      box.on('pointerout', () => box.setAlpha(1));
+      box.on('pointerdown', onClick);
     }
+  }
+
+  render() {
+    this.clearUi();
+    this.buildings.forEach((building) => { building.zone.input.enabled = state.screen === 'base'; });
+    this.drawHud();
+    if (state.screen === 'base') this.drawBase();
+    if (state.screen === 'inbox') this.drawInbox();
+    if (state.screen === 'sandbox') this.drawSandbox();
+    if (state.screen === 'report') this.drawReport();
+    if (state.result) this.drawResult();
+  }
+
+  drawHud() {
+    this.rect(640, 39, 1248, 58, palette.deep, .86);
+    const stats = [`DAY ${String(state.day).padStart(2, '0')}`, `完整性 ${state.integrity}%`, `物资 ${state.supplies}`, `金币 ${state.coins}`, `情报 ${state.intel}`, `沙盒 ${state.sandboxUses}/1`];
+    stats.forEach((value, index) => this.text(34 + index * 145, 28, value, { fontSize: '15px', fontStyle: 'bold', color: index === 1 && state.integrity < 50 ? '#ff9b91' : palette.ink }));
+    this.button(1037, 39, 92, 30, '基地', () => this.open('base'), 'default', state.screen === 'base');
+    this.button(1137, 39, 92, 30, `收件箱 ${state.unread}`, () => this.open('inbox'), 'default', state.screen === 'inbox');
+    this.button(1230, 39, 76, 30, state.night ? '白天' : '夜晚', () => { this.setNight(!state.night); this.render(); }, 'sun');
+  }
+
+  drawBase() {
+    this.rect(330, 654, 620, 84, palette.deep, .88);
+    this.text(48, 623, '基地状态', { fontSize: '13px', color: palette.moss, fontStyle: 'bold' });
+    this.hintText = this.text(48, 646, state.baseHint, { fontSize: '17px', wordWrap: { width: 540 } });
+    this.text(48, 680, state.impact, { fontSize: '13px', color: palette.muted, wordWrap: { width: 540 } });
+    this.button(1050, 650, 160, 38, `举报台${state.report ? ' · 新情报' : ''}`, () => this.open('report'), state.report ? 'moss' : 'default');
+    this.button(1050, 695, 160, 30, '查看收件箱', () => this.open('inbox'), 'sun');
+  }
+
+  drawTerminal(title, subtitle) {
+    this.rect(970, 395, 560, 620, palette.deep, .97);
+    this.text(720, 110, subtitle, { fontSize: '12px', color: palette.moss, fontStyle: 'bold' });
+    this.text(720, 132, title, { fontSize: '25px', fontStyle: 'bold', wordWrap: { width: 500 } });
+    this.button(1225, 94, 46, 26, '关闭', () => this.open('base'), 'default');
+  }
+
+  drawInbox() {
+    this.drawTerminal('收件箱', `${familyLabels[activeCard.family]} // 1 封待处理`);
+    this.text(720, 188, activeCard.subject, { fontSize: '21px', fontStyle: 'bold', wordWrap: { width: 485 } });
+    this.text(720, 250, activeCard.sender, { fontSize: '14px', color: palette.sun, wordWrap: { width: 485 } });
+    this.text(720, 276, `接收时间 ${activeCard.time}`, { fontSize: '13px', color: palette.muted });
+    this.text(720, 314, activeCard.paragraphs.join('\n\n'), { fontSize: '15px', lineSpacing: 6, wordWrap: { width: 485 } });
+    const cost = activeCard.verificationCost ?? 2;
+    if (this.verified) {
+      this.text(720, 454, `核验结果：${activeCard.clue}`, { fontSize: '13px', color: palette.moss, wordWrap: { width: 485 } });
+    } else {
+      this.button(790, 470, 140, 32, `核验线索 · ${cost} 金币`, () => this.verify(), 'default', state.coins < cost || state.resolved);
+    }
+    if (state.resolved) {
+      this.text(720, 548, '这封邮件已处理。结果会在基地状态中保留。', { fontSize: '15px', color: palette.muted, wordWrap: { width: 470 } });
+      return;
+    }
+    const sandboxDisabled = activeCard.sandboxEligible === false || state.sandboxUses <= 0;
+    this.button(788, 586, 136, 40, activeCard.acceptLabel ?? '接受并执行', () => this.resolve('accept'), 'danger');
+    this.button(940, 586, 100, 40, '举报', () => this.resolve('report'), 'moss');
+    this.button(1098, 586, 190, 40, activeCard.sandboxEligible === false ? '无可隔离载荷' : `沙盒 ${state.sandboxUses}/1`, () => this.useSandbox(), 'default', sandboxDisabled);
+  }
+
+  drawSandbox() {
+    this.drawTerminal('隔离沙盒', 'ISOLATED ENVIRONMENT // 不访问真实链接');
+    this.text(720, 194, activeCard.sandbox.join('\n\n'), { fontFamily: 'monospace', fontSize: '14px', color: '#d8f7d7', lineSpacing: 7, wordWrap: { width: 485 } });
+    const safe = activeCard.truth === 'malicious' ? '✓ 沙盒已阻断异常行为。' : '✓ 未发现异常行为，仍应核对订单。';
+    this.text(720, 394, safe, { fontSize: '15px', color: palette.moss });
+    this.button(800, 590, 150, 40, '确认举报', () => this.resolve('report'), 'moss', !this.sandboxViewed || state.resolved);
+    this.button(1010, 590, 150, 40, '返回邮件', () => this.open('inbox'), 'default');
+  }
+
+  drawReport() {
+    this.drawTerminal('举报台', 'THREAT INTELLIGENCE');
+    if (state.report) {
+      this.text(720, 202, state.report.title, { fontSize: '19px', fontStyle: 'bold', wordWrap: { width: 485 } });
+      this.text(720, 244, state.report.body, { fontSize: '15px', color: palette.muted, lineSpacing: 6, wordWrap: { width: 485 } });
+    } else {
+      this.text(720, 205, '暂无已提交的威胁情报。\n从收件箱或沙盒提交可疑邮件。', { fontSize: '16px', color: palette.muted, lineSpacing: 8 });
+    }
+    this.button(960, 590, 170, 40, '返回基地', () => this.open('base'), 'default');
+  }
+
+  verify() {
+    const cost = activeCard.verificationCost ?? 2;
+    if (state.coins < cost || state.resolved) return;
+    state.coins -= cost;
+    this.verified = true;
+    this.render();
+  }
+
+  useSandbox() {
+    if (state.resolved || activeCard.sandboxEligible === false || state.sandboxUses <= 0) return;
+    state.sandboxUses -= 1;
+    this.sandboxViewed = true;
+    this.open('sandbox');
+  }
+
+  applyResources(resources = {}) {
+    Object.entries(resources).forEach(([resource, amount]) => { state[resource] = Math.max(0, (state[resource] ?? 0) + amount); });
+  }
+
+  applyConstructionReward(reward) {
+    if (!reward) return;
+    reward.blueprints?.forEach((blueprint) => state.construction.blueprints.add(blueprint));
+    Object.entries(reward.components ?? {}).forEach(([component, amount]) => { state.construction.components[component] = (state.construction.components[component] ?? 0) + amount; });
+    state.construction.labour += reward.labour ?? 0;
+    Object.entries(reward.materials ?? {}).forEach(([material, amount]) => { state.construction.materials[material] = (state.construction.materials[material] ?? 0) + amount; });
+  }
+
+  resolve(action) {
+    if (state.resolved) return;
+    const outcome = activeCard.outcomes[action];
+    if (!outcome) return;
+    state.resolved = true;
+    state.unread = 0;
+    this.applyResources(outcome.resources);
+    this.applyConstructionReward(outcome.constructionReward);
+    if (outcome.guaranteedNightEffect) state.guaranteedNightEffects.push(outcome.guaranteedNightEffect);
+    if (outcome.retryAfterDays || outcome.marketBlacklistDays || outcome.followUp) state.deferredEvents.push({ cardId: activeCard.id, ...outcome });
+    if (outcome.facility) this.setBuildingState(outcome.facility, outcome.facilityState);
+    if (outcome.unlockExpansion) this.unlockExpansion(outcome.unlockExpansion);
+    state.impact = outcome.impact;
+    if (outcome.report) state.report = { title: activeCard.subject, body: outcome.report };
+    state.result = { kind: outcome.kind, title: outcome.title, message: outcome.message, learning: outcome.learning };
+    state.screen = outcome.report ? 'report' : 'base';
+    this.render();
+  }
+
+  drawResult() {
+    const x = state.screen === 'base' ? 640 : 335;
+    this.rect(x, 182, 520, 184, state.result.kind === 'secured' ? 0x173321 : 0x3b1c18, .97, state.result.kind === 'secured' ? palette.moss : palette.danger);
+    this.text(x - 232, 114, state.result.title, { fontSize: '20px', fontStyle: 'bold', wordWrap: { width: 460 } });
+    this.text(x - 232, 150, state.result.message, { fontSize: '14px', color: palette.muted, wordWrap: { width: 460 } });
+    this.text(x - 232, 199, `复盘：${state.result.learning}`, { fontSize: '13px', color: palette.ink, wordWrap: { width: 460 } });
+    this.button(x + 185, 247, 76, 28, '明白', () => { state.result = null; this.render(); }, 'default');
   }
 }
 
 new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game-container',
-  width: 960,
-  height: 540,
-  backgroundColor: '#6fa85c',
+  width: 1280,
+  height: 720,
+  backgroundColor: '#13271d',
   pixelArt: true,
   antialias: false,
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   scene: ShelterScene,
 });
-
-renderCard(activeCard);
-updateHud();

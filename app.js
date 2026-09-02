@@ -5,11 +5,14 @@ const state = {
   coins: 30,
   intel: 18,
   seeds: 0,
+  sandboxUses: 1,
   unreadThreats: 1,
   resolved: false,
   night: false,
   flags: new Set(),
-  nightThreats: [],
+  guaranteedNightEffects: [],
+  deferredEvents: [],
+  construction: { blueprints: new Set(), components: {}, labour: 0, materials: { wood: 0, scrap: 0 } },
 };
 
 const elements = {
@@ -19,6 +22,7 @@ const elements = {
   supplies: document.querySelector('#supplies-value'),
   coins: document.querySelector('#coins-value'),
   intel: document.querySelector('#intel-value'),
+  sandbox: document.querySelector('#sandbox-value'),
   threats: document.querySelector('#threat-value'),
   inboxBadge: document.querySelector('#inbox-badge'),
   result: document.querySelector('#result'),
@@ -35,6 +39,8 @@ const elements = {
   mailBody: document.querySelector('#mail-body'),
   mailClue: document.querySelector('#mail-clue'),
   sandboxLog: document.querySelector('#sandbox-log'),
+  verifyClue: document.querySelector('#verify-clue'),
+  sandboxAction: document.querySelector('[data-action="sandbox"]'),
 };
 
 let baseScene;
@@ -52,6 +58,7 @@ function updateHud() {
   elements.supplies.textContent = state.supplies;
   elements.coins.textContent = state.coins;
   elements.intel.textContent = state.intel;
+  elements.sandbox.textContent = `${state.sandboxUses}/1`;
   elements.threats.textContent = state.unreadThreats;
   elements.inboxBadge.textContent = state.unreadThreats;
   elements.mailCount.textContent = `收件箱 / ${state.unreadThreats} 封未读`;
@@ -77,6 +84,7 @@ function lockActions() {
   state.resolved = true;
   document.querySelectorAll('[data-action]').forEach((button) => { button.disabled = true; });
   document.querySelector('#sandbox-report').disabled = true;
+  elements.verifyClue.disabled = true;
 }
 
 function renderCard(card) {
@@ -84,7 +92,16 @@ function renderCard(card) {
   elements.mailSubject.textContent = card.subject;
   elements.mailSender.textContent = card.sender;
   elements.mailTime.textContent = card.time;
-  elements.mailClue.textContent = card.clue;
+  elements.mailClue.textContent = '';
+  elements.mailClue.classList.add('hidden');
+  elements.verifyClue.disabled = false;
+  elements.verifyClue.textContent = `花 ${card.verificationCost ?? 2} 金币核验`;
+  document.querySelector('#sandbox-report').disabled = true;
+  elements.sandboxAction.disabled = card.sandboxEligible === false || state.sandboxUses <= 0;
+  elements.sandboxAction.textContent = card.sandboxEligible === false
+    ? '此邮件不能使用沙盒'
+    : `隔离进沙盒（${state.sandboxUses}/1）`;
+  document.querySelector('[data-action="accept"]').textContent = card.acceptLabel ?? '接受并执行';
   elements.mailBody.replaceChildren();
   card.paragraphs.forEach((text) => {
     const paragraph = document.createElement('p');
@@ -105,9 +122,54 @@ function renderCard(card) {
   elements.sandboxLog.append(conclusion);
 }
 
+function revealVerification() {
+  if (state.resolved || !activeCard.clue || !elements.mailClue.classList.contains('hidden')) return;
+  const cost = activeCard.verificationCost ?? 2;
+  if (state.coins < cost) {
+    elements.impact.textContent = '金币不足，无法调用外部核验档案。';
+    return;
+  }
+  state.coins -= cost;
+  elements.mailClue.textContent = activeCard.clue;
+  elements.mailClue.classList.remove('hidden');
+  elements.verifyClue.disabled = true;
+  elements.verifyClue.textContent = '核验完成';
+  updateHud();
+}
+
+function useSandbox() {
+  if (state.resolved) return;
+  if (activeCard.sandboxEligible === false) {
+    elements.impact.textContent = '此事件没有可隔离的链接或附件；请改用付费核验。';
+    return;
+  }
+  if (state.sandboxUses <= 0) {
+    elements.impact.textContent = '今天的沙盒额度已用尽，明天清晨才会恢复。';
+    return;
+  }
+  state.sandboxUses -= 1;
+  document.querySelector('#sandbox-report').disabled = false;
+  elements.sandboxAction.disabled = true;
+  elements.sandboxAction.textContent = '今日沙盒已使用';
+  updateHud();
+  showTab('sandbox');
+}
+
 function applyResources(resources = {}) {
   Object.entries(resources).forEach(([resource, amount]) => {
     state[resource] = Math.max(0, (state[resource] ?? 0) + amount);
+  });
+}
+
+function applyConstructionReward(reward) {
+  if (!reward) return;
+  reward.blueprints?.forEach((blueprint) => state.construction.blueprints.add(blueprint));
+  Object.entries(reward.components ?? {}).forEach(([component, amount]) => {
+    state.construction.components[component] = (state.construction.components[component] ?? 0) + amount;
+  });
+  state.construction.labour += reward.labour ?? 0;
+  Object.entries(reward.materials ?? {}).forEach(([material, amount]) => {
+    state.construction.materials[material] = (state.construction.materials[material] ?? 0) + amount;
   });
 }
 
@@ -119,7 +181,9 @@ function resolveMail(action) {
   lockActions();
   state.unreadThreats = 0;
   applyResources(outcome.resources);
-  if (outcome.nightThreat) state.nightThreats.push(outcome.nightThreat);
+  applyConstructionReward(outcome.constructionReward);
+  if (outcome.guaranteedNightEffect) state.guaranteedNightEffects.push(outcome.guaranteedNightEffect);
+  if (outcome.retryAfterDays || outcome.marketBlacklistDays || outcome.followUp) state.deferredEvents.push({ cardId: activeCard.id, ...outcome });
   if (outcome.facility) baseScene?.setBuildingState(outcome.facility, outcome.facilityState);
   if (outcome.unlockExpansion) baseScene?.unlockExpansion(outcome.unlockExpansion);
   elements.impact.textContent = outcome.impact;
@@ -139,8 +203,9 @@ elements.actionArea.addEventListener('click', (event) => {
   const action = event.target.dataset.action;
   if (!action || state.resolved) return;
   if (action === 'accept' || action === 'report') resolveMail(action);
-  if (action === 'sandbox') showTab('sandbox');
+  if (action === 'sandbox') useSandbox();
 });
+elements.verifyClue.addEventListener('click', revealVerification);
 document.querySelector('#sandbox-report').addEventListener('click', () => resolveMail('report'));
 document.querySelector('#return-base').addEventListener('click', () => showTab('base'));
 elements.timeToggle.addEventListener('click', () => {

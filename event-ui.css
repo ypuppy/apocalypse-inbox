@@ -1,0 +1,32 @@
+.clue-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clue p {
+  margin-top: 10px;
+}
+
+.clue-button {
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--panel) 75%, transparent);
+  font-size: .78rem;
+  font-weight: 750;
+}
+
+.clue-button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+@media (max-width: 720px) {
+  .clue-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

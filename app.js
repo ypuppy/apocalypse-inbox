@@ -116,9 +116,13 @@ class ShelterScene extends Phaser.Scene {
     this.createBuildingZone('command', 468, 175, 185, 120, '指挥室', '点击打开收件箱');
     this.createBuildingZone('radio', 132, 142, 118, 246, '无线电站', '接收外部求救');
     this.createBuildingZone('warehouse', 720, 172, 190, 160, '仓库', '储存补给');
-    this.createBuildingZone('water', 708, 390, 165, 132, '净水站', '住民饮水');
     this.createBuildingZone('clinic', 535, 405, 145, 110, '医疗站', '处理伤员');
     this.createBuildingZone('relay', 142, 350, 120, 122, '网络中继器', '保护通讯链路');
+    this.createExpansionZone('garden', 245, 246, 168, 124, '菜园用地', '未开发 · 需要菜园蓝图与种子');
+    this.createExpansionZone('water', 724, 385, 170, 134, '净水设施用地', '未开发 · 需要净水器与滤芯');
+    this.createExpansionZone('west-yard', 285, 365, 135, 146, '西侧扩建地块', '预留 · 等待后续任务解锁');
+    this.createExpansionZone('east-yard', 842, 360, 118, 162, '东侧扩建地块', '预留 · 等待后续任务解锁');
+    this.createExpansionZone('south-yard', 445, 483, 212, 74, '南门外扩区', '预留 · 可扩展防线或工坊');
     this.createResidents();
 
     this.nightOverlay = this.add.rectangle(480, 270, 960, 540, 0x071021, 0).setDepth(20);
@@ -148,6 +152,38 @@ class ShelterScene extends Phaser.Scene {
     });
 
     this.buildings.set(id, { frame, marker, label, description, status: null });
+  }
+
+  createExpansionZone(id, x, y, width, height, label, description) {
+    const frame = this.add.rectangle(x, y, width, height, 0x8acb81, 0).setStrokeStyle(2, 0x8acb81, 0).setDepth(12);
+    const marker = this.add.circle(x + width / 2 - 13, y - height / 2 + 13, 6, 0x8acb81, 0).setDepth(13);
+    const zone = this.add.zone(x, y, width, height).setInteractive({ useHandCursor: true }).setDepth(14);
+
+    zone.on('pointerover', () => {
+      frame.setStrokeStyle(2, 0x8acb81, .88);
+      marker.setFillStyle(0x8acb81).setAlpha(1);
+      const status = this.buildings.get(id)?.status;
+      elements.selection.textContent = status === 'locked'
+        ? `${label} · ${description}`
+        : `${label} · 蓝图已到位，可部署设施`;
+    });
+    zone.on('pointerout', () => {
+      if (this.buildings.get(id)?.status === 'locked') {
+        frame.setStrokeStyle(2, 0x8acb81, 0);
+        marker.setAlpha(0);
+      }
+    });
+    zone.on('pointerdown', () => {
+      const status = this.buildings.get(id)?.status;
+      if (status === 'locked') {
+        elements.selection.textContent = `${label} · 未解锁`;
+        elements.impact.textContent = '这块地已预留。后续正确处置邮件可带来蓝图、物资或施工权限。';
+      } else {
+        elements.selection.textContent = `${label} · 蓝图已到位，可部署设施`;
+      }
+    });
+
+    this.buildings.set(id, { frame, marker, label, description, status: 'locked', kind: 'expansion' });
   }
 
   createResidents() {
@@ -184,6 +220,15 @@ class ShelterScene extends Phaser.Scene {
       building.marker.setFillStyle(0xa7d97d).setAlpha(1);
       elements.selection.textContent = `${building.label} · 已升级域名过滤规则`;
     }
+    if (status === 'available') {
+      building.frame.setStrokeStyle(3, 0x8acb81, 1);
+      building.marker.setFillStyle(0x8acb81).setAlpha(1);
+      elements.selection.textContent = `${building.label} · 蓝图已到位，可部署设施`;
+    }
+  }
+
+  unlockExpansion(id) {
+    this.setBuildingState(id, 'available');
   }
 
   setNight(isNight) {

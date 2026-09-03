@@ -121,23 +121,19 @@ class ShelterScene extends Phaser.Scene {
   drawHud() {
     this.rect(640, 39, 1248, 58, palette.deep, .86);
     const stats = [`DAY ${String(state.day).padStart(2, '0')} · ${formatClock(state.clockMinutes)}`, `防御 ${state.defense}`, `物资 ${state.supplies}`, `金币 ${state.coins}`, `情报 ${state.intel}`, `沙盒 ${state.sandboxUses}/1`];
-    [34, 190, 315, 420, 525, 625].forEach((x, index) => this.text(x, 28, stats[index], { fontSize: '14px', fontStyle: 'bold', color: index === 1 && state.defense < 50 ? '#ff9b91' : palette.ink }));
-    this.button(850, 39, 76, 30, '基地', () => this.open('base'), 'default', state.screen === 'base');
-    this.button(934, 39, 100, 30, `收件箱 ${state.unread}`, () => this.open('inbox'), 'default', state.screen === 'inbox' || state.unread === 0);
-    this.button(1043, 39, 90, 30, `归档 ${state.processedMails.length}`, () => this.open('archive'), 'default', state.screen === 'archive');
-    if (DEVELOPER_MODE && state.phase === 'day') this.button(1185, 39, 130, 30, '测试：跳至夜晚', () => this.skipToNight(), 'sun');
-    if (state.phase === 'night') this.text(1180, 28, '夜晚结算中', { fontSize: '14px', fontStyle: 'bold', color: palette.sun });
+    stats.forEach((value, index) => this.text(34 + index * 128, 28, value, { fontSize: '14px', fontStyle: 'bold', color: index === 1 && state.defense < 50 ? '#ff9b91' : palette.ink }));
+    this.button(926, 39, 66, 30, '基地', () => this.open('base'), 'default', state.screen === 'base');
+    this.button(1009, 39, 94, 30, `收件箱 ${state.unread}`, () => this.open('inbox'), 'default', state.screen === 'inbox');
+    this.button(1110, 39, 100, 30, `举报台${state.report ? ' · 新情报' : ''}`, () => this.open('report'), state.report ? 'moss' : 'default');
+    if (DEVELOPER_MODE && state.phase === 'day') this.button(1217, 39, 72, 30, '跳至夜晚', () => this.skipToNight(), 'sun');
+    if (state.phase === 'night') this.text(1217, 28, '夜晚结算', { fontSize: '13px', fontStyle: 'bold', color: palette.sun }).setOrigin(.5, 0);
   }
 
   drawBase() {
-    this.rect(350, 650, 620, 96, palette.deep, .9);
-    this.text(350, 612, `基地状态 · ${state.phase === 'day' ? '白天行动' : '夜晚结算'}`, { fontSize: '13px', color: palette.moss, fontStyle: 'bold', align: 'center', wordWrap: { width: 560 } }).setOrigin(.5, 0);
-    this.hintText = this.text(350, 637, state.baseHint, { fontSize: '17px', align: 'center', wordWrap: { width: 560 } }).setOrigin(.5, 0);
-    this.text(350, 674, `${state.impact}\n闸门 ${state.security.gate ? '在线' : '受损'} · 警报网 ${state.security.alarm ? '在线' : '离线'}`, { fontSize: '13px', color: palette.muted, align: 'center', lineSpacing: 4, wordWrap: { width: 560 } }).setOrigin(.5, 0);
-    this.button(930, 632, 124, 34, '仓库与建造', () => this.openWarehouse(), 'moss');
-    this.button(1065, 632, 124, 34, `处理邮件 ${state.processedMails.length}`, () => this.open('archive'), 'default');
-    this.button(930, 682, 124, 30, `举报台${state.report ? ' · 新' : ''}`, () => this.open('report'), state.report ? 'moss' : 'default');
-    this.button(1065, 682, 124, 30, state.unread ? '查看收件箱' : '等待夜晚', () => this.open('inbox'), 'sun', !state.unread);
+    this.rect(320, 654, 560, 92, palette.deep, .88);
+    this.text(320, 619, `基地状态 · ${state.phase === 'day' ? '白天行动' : '夜晚结算'}`, { fontSize: '13px', color: palette.moss, fontStyle: 'bold', align: 'center', wordWrap: { width: 500 } }).setOrigin(.5, 0);
+    this.hintText = this.text(320, 644, state.baseHint, { fontSize: '17px', align: 'center', wordWrap: { width: 500 } }).setOrigin(.5, 0);
+    this.text(320, 680, state.impact, { fontSize: '13px', color: palette.muted, align: 'center', wordWrap: { width: 500 } }).setOrigin(.5, 0);
   }
 
   drawTerminal(title, subtitle) {

@@ -120,13 +120,17 @@ class ShelterScene extends Phaser.Scene {
 
   drawHud() {
     this.rect(640, 39, 1248, 58, palette.deep, .86);
-    const stats = [`DAY ${String(state.day).padStart(2, '0')} · ${formatClock(state.clockMinutes)}`, `防御 ${state.defense}`, `物资 ${state.supplies}`, `金币 ${state.coins}`, `情报 ${state.intel}`, `沙盒 ${state.sandboxUses}/1`];
+    const card = getCard(state.currentCardId);
+    const stats = [`DAY ${String(state.day).padStart(2, '0')} · ${formatClock(state.clockMinutes)}`, `防御 ${state.defense}`, `物资 ${state.supplies}`, `金币 ${state.coins}`, `情报 ${state.intel}`];
     stats.forEach((value, index) => this.text(34 + index * 128, 28, value, { fontSize: '14px', fontStyle: 'bold', color: index === 1 && state.defense < 50 ? '#ff9b91' : palette.ink }));
-    this.button(926, 39, 66, 30, '基地', () => this.open('base'), 'default', state.screen === 'base');
-    this.button(1009, 39, 94, 30, `收件箱 ${state.unread}`, () => this.open('inbox'), 'default', state.screen === 'inbox');
-    this.button(1110, 39, 100, 30, `举报台${state.report ? ' · 新情报' : ''}`, () => this.open('report'), state.report ? 'moss' : 'default');
-    if (DEVELOPER_MODE && state.phase === 'day') this.button(1217, 39, 72, 30, '跳至夜晚', () => this.skipToNight(), 'sun');
-    if (state.phase === 'night') this.text(1217, 28, '夜晚结算', { fontSize: '13px', fontStyle: 'bold', color: palette.sun }).setOrigin(.5, 0);
+    this.button(710, 39, 60, 30, '基地', () => this.open('base'), 'default', state.screen === 'base');
+    this.button(785, 39, 82, 30, `收件箱 ${state.unread}`, () => this.open('inbox'), 'default', state.screen === 'inbox');
+    this.button(870, 39, 80, 30, `归档 ${state.processedMails.length}`, () => this.open('archive'), state.processedMails.length ? 'moss' : 'default', state.screen === 'archive');
+    const sandboxDisabled = state.phase !== 'day' || !card || !state.unread || card.sandboxEligible === false || state.sandboxUses <= 0;
+    this.button(950, 39, 72, 30, `沙盒 ${state.sandboxUses}/1`, () => this.useSandbox(), 'default', state.screen === 'sandbox' || sandboxDisabled);
+    this.button(1042, 39, 100, 30, '仓库 / 建造', () => this.openWarehouse(), 'default', state.screen === 'warehouse');
+    this.button(1142, 39, 88, 30, `举报台${state.report ? ' · 新' : ''}`, () => this.open('report'), state.report ? 'moss' : 'default', state.screen === 'report');
+    if (DEVELOPER_MODE) this.button(1234, 39, 88, 30, state.phase === 'day' ? '跳至夜晚' : '查看夜报', () => state.phase === 'day' ? this.skipToNight() : this.open('night'), 'sun', state.phase === 'night' && state.screen === 'night');
   }
 
   drawBase() {

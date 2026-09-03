@@ -26,7 +26,7 @@ const eventCards = [
     clue: '水源修复署的可信域名是 waterworks.org；发件地址中的 waterworkss 多了一个 s。',
     sandbox: ['打开隔离浏览器…', '发现跳转：waterworkss.org → waterworks-login.org', '目标页面请求避难所通行凭证。'],
     outcomes: {
-      accept: { kind: 'accepted', title: '避难所通行凭证已泄露', message: '伪造页面尝试接入避难所网络。完整性 -25%，网络中继器受损。', learning: '紧急物资通知也要核对完整域名，而不是只看显示名称。', resources: { integrity: -25 }, facility: 'relay', facilityState: 'damaged', impact: '账户会话被盗，网络中继器出现异常调用。', guaranteedNightEffect: { type: 'unauthorized-requisition', targets: ['warehouse', 'relay'], consequence: 'transfer-supplies' } },
+      accept: { kind: 'accepted', title: '避难所通行凭证已泄露', message: '伪造页面尝试接入避难所网络。防御力 -25，网络中继器受损。', learning: '紧急物资通知也要核对完整域名，而不是只看显示名称。', resources: { defense: -25 }, facility: 'relay', facilityState: 'damaged', impact: '账户会话被盗，网络中继器出现异常调用。', guaranteedNightEffect: { type: 'unauthorized-requisition', targets: ['warehouse', 'relay'], consequence: 'transfer-supplies' } },
       report: { kind: 'secured', title: '仿冒运输通知已阻断', message: '你截获了钓鱼链路，避难所获得 6 点情报。', learning: '相似域名与人为制造的时间压力，是典型的运输钓鱼组合。', resources: { intel: 6 }, facility: 'radio', facilityState: 'upgraded', impact: '无线电站获得新的域名过滤规则。', report: '识别到仿冒域名、二次跳转与凭证索取。' },
     },
   },
@@ -59,7 +59,7 @@ const eventCards = [
     clue: '可信医疗调配域名是 med-aid-center.net；此外，正式清单只会出现在运输台账。',
     sandbox: ['打开隔离附件…', '附件试图请求终端的设备控制权限。', '隔离环境已阻断异常启动行为。'],
     outcomes: {
-      accept: { kind: 'accepted', title: '伪造清单感染了终端', message: '设备完整性 -18%，医疗站的夜间状态监测将不稳定。', learning: '来自可信主题的附件同样需要核验；不要在主终端打开未知文件。', resources: { integrity: -18 }, facility: 'clinic', facilityState: 'damaged', impact: '医疗站终端出现异常进程。', guaranteedNightEffect: { type: 'device-disruption', targets: ['clinic'], consequence: 'disable-monitoring' } },
+      accept: { kind: 'accepted', title: '伪造清单感染了终端', message: '基地防御力 -18，医疗站的夜间状态监测将不稳定。', learning: '来自可信主题的附件同样需要核验；不要在主终端打开未知文件。', resources: { defense: -18 }, facility: 'clinic', facilityState: 'damaged', impact: '医疗站终端出现异常进程。', guaranteedNightEffect: { type: 'device-disruption', targets: ['clinic'], consequence: 'disable-monitoring' } },
       report: { kind: 'secured', title: '恶意附件已隔离', message: '避难所获得 7 点情报，医疗终端未受影响。', learning: '沙盒的价值在于观察行为，而不是把附件当作真实文件执行。', resources: { intel: 7 }, impact: '医疗站保持离线安全状态。', report: '伪造医疗运输附件请求了不必要的终端权限。' },
     },
   },
@@ -227,7 +227,7 @@ const eventCards = [
     clue: '可信维护域名是 relay-union.org；发件地址把字母 o 换成了数字 0，且要求绕过既有维护窗口。',
     sandbox: ['打开隔离更新包…', '更新包试图替换中继器的远程控制配置。', '隔离环境阻止了设备配置写入。'],
     outcomes: {
-      accept: { kind: 'accepted', title: '中继器控制权被篡改', message: '完整性 -20%，夜晚会出现设备干扰。', learning: '紧急补丁不能跳过受控维护渠道；越要求管理员权限，越应谨慎核验。', resources: { integrity: -20 }, facility: 'relay', facilityState: 'damaged', impact: '网络中继器的远程配置被篡改。', guaranteedNightEffect: { type: 'device-disruption', targets: ['relay'], consequence: 'disable-alarm-network' } },
+      accept: { kind: 'accepted', title: '中继器控制权被篡改', message: '基地防御力 -20，夜晚会出现设备干扰。', learning: '紧急补丁不能跳过受控维护渠道；越要求管理员权限，越应谨慎核验。', resources: { defense: -20 }, facility: 'relay', facilityState: 'damaged', impact: '网络中继器的远程配置被篡改。', guaranteedNightEffect: { type: 'device-disruption', targets: ['relay'], consequence: 'disable-alarm-network' } },
       report: { kind: 'secured', title: '伪造维护包已隔离', message: '你阻断了设备控制篡改，获得 8 点情报。', learning: '真实维护会留下可核验的窗口、签名和内部渠道。', resources: { intel: 8 }, impact: '中继器保持受控维护状态。', report: '伪造补丁试图改写中继器的远程控制配置。' },
     },
   },

@@ -131,7 +131,7 @@ class ShelterScene extends Phaser.Scene {
     const colors = { default: [0x183228, palette.line, palette.ink], moss: [palette.moss, palette.moss, '#102212'], danger: [palette.danger, palette.danger, '#2d0c08'], sun: [palette.sun, palette.sun, '#30250d'] };
     const [fill, stroke, textColor] = colors[tone];
     const box = this.keep(this.add.rectangle(x, y, width, height, fill, disabled ? .35 : 1).setStrokeStyle(1, stroke, .95).setDepth(31));
-    const caption = this.text(x, y, label, { fontSize: '14px', fontStyle: 'bold', color: textColor }).setOrigin(.5);
+    const caption = this.text(x, y, label, { fontSize: '13px', fontStyle: 'bold', color: textColor }).setOrigin(.5).setDepth(32);
     if (!disabled) {
       box.setInteractive({ useHandCursor: true });
       box.on('pointerover', () => box.setAlpha(.82));
@@ -154,19 +154,18 @@ class ShelterScene extends Phaser.Scene {
   drawHud() {
     this.rect(640, 39, 1248, 58, palette.deep, .86);
     const stats = [`DAY ${String(state.day).padStart(2, '0')}`, `完整性 ${state.integrity}%`, `物资 ${state.supplies}`, `金币 ${state.coins}`, `情报 ${state.intel}`, `沙盒 ${state.sandboxUses}/1`];
-    stats.forEach((value, index) => this.text(34 + index * 145, 28, value, { fontSize: '15px', fontStyle: 'bold', color: index === 1 && state.integrity < 50 ? '#ff9b91' : palette.ink }));
-    this.button(1037, 39, 92, 30, '基地', () => this.open('base'), 'default', state.screen === 'base');
-    this.button(1137, 39, 92, 30, `收件箱 ${state.unread}`, () => this.open('inbox'), 'default', state.screen === 'inbox');
-    this.button(1230, 39, 76, 30, state.night ? '白天' : '夜晚', () => { this.setNight(!state.night); this.render(); }, 'sun');
+    stats.forEach((value, index) => this.text(34 + index * 128, 28, value, { fontSize: '15px', fontStyle: 'bold', color: index === 1 && state.integrity < 50 ? '#ff9b91' : palette.ink }));
+    this.button(926, 39, 66, 30, '基地', () => this.open('base'), 'default', state.screen === 'base');
+    this.button(1009, 39, 94, 30, `收件箱 ${state.unread}`, () => this.open('inbox'), 'default', state.screen === 'inbox');
+    this.button(1110, 39, 100, 30, `举报台${state.report ? ' · 新情报' : ''}`, () => this.open('report'), state.report ? 'moss' : 'default');
+    this.button(1217, 39, 72, 30, state.night ? '白天' : '夜晚', () => { this.setNight(!state.night); this.render(); }, 'sun');
   }
 
   drawBase() {
-    this.rect(330, 654, 620, 84, palette.deep, .88);
-    this.text(48, 623, '基地状态', { fontSize: '13px', color: palette.moss, fontStyle: 'bold' });
-    this.hintText = this.text(48, 646, state.baseHint, { fontSize: '17px', wordWrap: { width: 540 } });
-    this.text(48, 680, state.impact, { fontSize: '13px', color: palette.muted, wordWrap: { width: 540 } });
-    this.button(1050, 650, 160, 38, `举报台${state.report ? ' · 新情报' : ''}`, () => this.open('report'), state.report ? 'moss' : 'default');
-    this.button(1050, 695, 160, 30, '查看收件箱', () => this.open('inbox'), 'sun');
+    this.rect(320, 654, 560, 92, palette.deep, .88);
+    this.text(320, 619, '基地状态', { fontSize: '13px', color: '#a7d97d', fontStyle: 'bold', align: 'center', wordWrap: { width: 500 } }).setOrigin(.5, 0);
+    this.hintText = this.text(320, 644, state.baseHint, { fontSize: '17px', align: 'center', wordWrap: { width: 500 } }).setOrigin(.5, 0);
+    this.text(320, 680, state.impact, { fontSize: '13px', color: palette.muted, align: 'center', wordWrap: { width: 500 } }).setOrigin(.5, 0);
   }
 
   drawTerminal(title, subtitle) {

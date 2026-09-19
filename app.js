@@ -28,11 +28,15 @@ class ShelterScene extends Phaser.Scene {
     this.sandboxViewed = false;
   }
 
-  preload() { this.load.image('base-day', './assets/base-day.webp'); }
+  preload() {
+    this.load.image('base-day', './assets/base-day-phaser.webp');
+    this.load.image('base-night', './assets/base-night-phaser-user-edited.webp');
+  }
 
   create() {
-    this.add.image(640, 360, 'base-day').setDisplaySize(1280, 720).setDepth(0);
-    this.nightOverlay = this.add.rectangle(640, 360, 1280, 720, 0x071021, 0).setDepth(20);
+    this.dayBackground = this.add.image(640, 360, 'base-day').setDisplaySize(1280, 720).setDepth(0);
+    // This is a separate Blender night render, not a flat Phaser tint: practical lamps illuminate the base.
+    this.nightBackground = this.add.image(640, 360, 'base-night').setDisplaySize(1280, 720).setDepth(1).setAlpha(0);
     this.createWorldZones();
     this.time.addEvent({ delay: 1800, loop: true, callback: () => this.tickClock() });
     this.setNight(false);
@@ -40,16 +44,17 @@ class ShelterScene extends Phaser.Scene {
   }
 
   createWorldZones() {
-    this.createWorldZone('command', 624, 233, 245, 158, '指挥室', '打开收件箱', () => this.open('inbox'));
-    this.createWorldZone('radio', 176, 189, 157, 328, '无线电站', '核验档案与接收求助');
-    this.createWorldZone('warehouse', 960, 229, 250, 210, '仓库', '查看蓝图、组件与施工材料', () => this.openWarehouse());
-    this.createWorldZone('clinic', 713, 540, 190, 150, '医疗站', '处理伤员');
-    this.createWorldZone('relay', 190, 467, 160, 160, '网络中继器', '保护通讯链路');
-    this.createWorldZone('gate', 625, 646, 190, 100, '西门闸门', '基础防线：提供 14 点防守加成');
-    this.createWorldZone('garden', 327, 328, 224, 165, '菜园用地', '点击查看建造条件', () => this.openWarehouse('garden'), 'expansion');
-    this.createWorldZone('water', 965, 513, 225, 178, '净水设施用地', '点击查看建造条件', () => this.openWarehouse('water'), 'expansion');
-    this.createWorldZone('west-yard', 380, 487, 180, 190, '西侧扩建地块', '预留：未来可扩展防线或工坊', null, 'expansion');
-    this.createWorldZone('east-yard', 1120, 480, 150, 190, '东侧扩建地块', '预留：未来可扩展设施', null, 'expansion');
+    // Coordinates match the user-adjusted Blender camera export, scaled from its 960×540 render to 1280×720.
+    this.createWorldZone('command', 625, 257, 245, 164, '指挥室', '打开收件箱', () => this.open('inbox'));
+    this.createWorldZone('radio', 176, 195, 150, 245, '无线电站', '核验档案与接收求助');
+    this.createWorldZone('warehouse', 975, 301, 250, 215, '仓库', '查看蓝图、组件与施工材料', () => this.openWarehouse());
+    this.createWorldZone('clinic', 684, 566, 190, 150, '医疗站', '处理伤员');
+    this.createWorldZone('relay', 208, 497, 150, 160, '网络中继器', '保护通讯链路');
+    this.createWorldZone('gate', 640, 680, 190, 80, '西门闸门', '基础防线：提供 14 点防守加成');
+    this.createWorldZone('garden', 300, 274, 215, 160, '菜园用地', '点击查看建造条件', () => this.openWarehouse('garden'), 'expansion');
+    this.createWorldZone('water', 910, 570, 225, 170, '净水设施用地', '点击查看建造条件', () => this.openWarehouse('water'), 'expansion');
+    this.createWorldZone('west-yard', 390, 505, 180, 190, '西侧扩建地块', '预留：未来可扩展防线或工坊', null, 'expansion');
+    this.createWorldZone('east-yard', 1090, 507, 150, 190, '东侧扩建地块', '预留：未来可扩展设施', null, 'expansion');
   }
 
   createWorldZone(id, x, y, width, height, label, description, action = null, kind = 'building') {
@@ -77,7 +82,10 @@ class ShelterScene extends Phaser.Scene {
   }
 
   setHint(text) { state.baseHint = text; this.hintText?.setText(text); }
-  setNight(isNight) { this.nightOverlay.setAlpha(isNight ? .6 : 0); }
+  setNight(isNight) {
+    const duration = this.nightBackground.alpha === 0 && !isNight ? 0 : 650;
+    this.tweens.add({ targets: this.nightBackground, alpha: isNight ? 1 : 0, duration, ease: 'Sine.easeInOut' });
+  }
 
   setBuildingState(id, status) {
     state.facilityStatus[id] = status;
